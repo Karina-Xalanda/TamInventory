@@ -9,6 +9,11 @@ import org.bson.types.ObjectId;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Sorts;
+import java.util.Arrays;
+
 public class VentaDAO {
 
     private MongoCollection<Document> coleccion;
@@ -37,5 +42,17 @@ public class VentaDAO {
             total += doc.getDouble("totalVenta");
         }
         return total;
+    }
+
+    public List<Document> obtenerTamalMasVendidoSemanal() {
+        List<Document> resultado = new ArrayList<>();
+
+        coleccion.aggregate(Arrays.asList(
+                Aggregates.unwind("$detalles"),
+                Aggregates.group("$detalles.idProducto", Accumulators.sum("totalVendido", "$detalles.cantidad")),
+                Aggregates.sort(Sorts.descending("totalVendido"))
+        )).into(resultado);
+
+        return resultado;
     }
 }

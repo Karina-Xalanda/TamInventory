@@ -30,18 +30,30 @@
 <body>
 <h2>Bienvenido, <%= session.getAttribute("usuario") %></h2>
 <div class="modulos">
+
     <button class="btn-modulo ventas"
             onclick="location.href='${pageContext.request.contextPath}/vistas/ventas.jsp'">
-        🧾<br>Ventas
+        <br>Ventas
     </button>
     <button class="btn-modulo insumos"
-            onclick="location.href='${pageContext.request.contextPath}/vistas/insumos.jsp'">
-        📦<br>Insumos
+            onclick="location.href='${pageContext.request.contextPath}/insumos'">
+        <br>Insumos
     </button>
     <button class="btn-modulo corte"
             onclick="location.href='${pageContext.request.contextPath}/vistas/corte.jsp'">
-        💰<br>Corte de Caja
+        <br>Corte de Caja
     </button>
+
+    <button class="btn-modulo" style="background: #e74c3c;"
+            onclick="location.href='${pageContext.request.contextPath}/vistas/egresos.jsp'">
+        <br>Gastos y Mermas
+    </button>
+
+    <button class="btn-modulo" style="background: #8e44ad;"
+            onclick="location.href='${pageContext.request.contextPath}/reportes'">
+        <br>Reportes y Analítica
+    </button>
+
 </div>
 <a class="salir" href="${pageContext.request.contextPath}/logout">Cerrar sesión</a>
 </body>
