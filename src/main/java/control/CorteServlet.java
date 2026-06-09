@@ -2,49 +2,80 @@ package control;
 
 import datos.CorteCajaDAO;
 import datos.GastoDAO;
+import datos.MermaDAO;
 import datos.VentaDAO;
 import modelos.CorteCaja;
+
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 @WebServlet("/corte")
 public class CorteServlet extends HttpServlet {
 
+    //  calcula ventas, gastos y mermas del dia automaticamente
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+
+        if (req.getSession().getAttribute("usuario") == null) {
+            resp.sendRedirect(req.getContextPath() + "/login");
+            return;
+        }
+
+        double ventasHoy = new VentaDAO().sumarVentasHoy();
+        double gastosHoy = new GastoDAO().sumarGastosHoy();
+        double mermasHoy = new MermaDAO().sumarMermasHoy();
+
+        req.setAttribute("ventasHoy", ventasHoy);
+        req.setAttribute("gastosHoy", gastosHoy);
+        req.setAttribute("mermasHoy", mermasHoy);
+
+        req.getRequestDispatcher("/vistas/corte.jsp").forward(req, resp);
+    }
+
+    //  recibe efectivo inicial y real, calcula y guarda el corte
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // Recuperar datos del formulario
-        int hoy = Integer.parseInt(req.getParameter("tamalesHoy"));
-        int ayer = Integer.parseInt(req.getParameter("tamalesAyer"));
-        int mermas = Integer.parseInt(req.getParameter("mermas"));
-        double efectivoReal = Double.parseDouble(req.getParameter("efectivoReal"));
-        double inicial = Double.parseDouble(req.getParameter("efectivoInicial"));
+        try {
+            double efectivoInicial = Double.parseDouble(req.getParameter("efectivoInicial"));
+            double efectivoReal    = Double.parseDouble(req.getParameter("efectivoReal"));
 
-        // Obtener totales automaticos de MongoDB
-        VentaDAO vDao = new VentaDAO();
-        GastoDAO gDao = new GastoDAO();
-        double ventasDelDia = vDao.sumarVentasHoy();
-        double gastosDelDia = gDao.sumarGastosHoy();
+            // se reconsulta la BD, no se confia en valores del formulario
+            double ventasHoy = new VentaDAO().sumarVentasHoy();
+            double gastosHoy = new GastoDAO().sumarGastosHoy();
+            double mermasHoy = new MermaDAO().sumarMermasHoy();
 
-        // calculadora
-        // (Ventas + Inicial) - Gastos = Dinero que debe haber
-        CorteCaja corte = new CorteCaja(inicial);
-        corte.setEfectivoReal(efectivoReal);
+            // formula completa: inicial + ventas - gastos - mermas
+            CorteCaja corte = new CorteCaja(efectivoInicial);
+            corte.setEfectivoReal(efectivoReal);
+            corte.calcularEfectivoEsperado(ventasHoy, gastosHoy + mermasHoy);
 
-        double esperado = corte.calcularEfectivoEsperado(ventasDelDia, gastosDelDia); //
-        double diferencia = corte.validarDiferencia(); //
+            double diferencia = corte.validarDiferencia();
+            corte.setNotas(diferencia == 0
+                    ? "Corte perfecto"
+                    : (diferencia > 0
+                       ? "Sobrante: $" + String.format("%.2f", diferencia)
+                       : "Faltante: $" + String.format("%.2f", Math.abs(diferencia))));
 
-        // guardar en MongoDB Atlas
-        CorteCajaDAO corteDao = new CorteCajaDAO();
-        corte.setNotas("Inventario procesado: " + (hoy + ayer - mermas) + " unidades vendidas.");
-        corteDao.insertar(corte); //
+            new CorteCajaDAO().insertar(corte);
 
-        // enviar resultados a la vista de exito
-        req.setAttribute("corte", corte);
-        req.setAttribute("diferencia", diferencia);
-        req.getRequestDispatcher("vistas/resultado_corte.jsp").forward(req, resp);
+            req.setAttribute("corte",      corte);
+            req.setAttribute("diferencia", diferencia);
+            req.setAttribute("ventasHoy",  ventasHoy);
+            req.setAttribute("gastosHoy",  gastosHoy);
+            req.setAttribute("mermasHoy",  mermasHoy);
+
+            req.getRequestDispatcher("/vistas/corte.jsp").forward(req, resp);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            resp.sendRedirect(req.getContextPath() + "/corte?error=1");
+        }
     }
 }
